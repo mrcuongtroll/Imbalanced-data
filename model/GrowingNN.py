@@ -28,6 +28,8 @@ class GrowingMLP(nn.Module):
         super(GrowingMLP, self).__init__()
         self.device = device
         self.activation_table = {}
+        self.pre_act_table = {} # Used for GradMax
+        self.hidden_table = {} # Used for GradMax
         self.hook_table = {}
         self.linear1 = nn.Linear(input_size, 128)
         self.linear2 = nn.Linear(128, 256)
@@ -72,21 +74,38 @@ class GrowingMLP(nn.Module):
 
     def forward(self, x):
         z1 = self.linear1(x)
-        z1 = self.act(z1)
-        self.activation_table['linear1'] = z1.detach().cpu().numpy()
-        z2 = self.linear2(z1)
-        z2 = self.act(z2)
-        self.activation_table['linear2'] = z2.detach().cpu().numpy()
-        z3 = self.linear3(z2)
-        z3 = self.act(z3)
-        self.activation_table['linear3'] = z3.detach().cpu().numpy()
-        z4 = self.linear4(z3)
-        z4 = self.act(z4)
-        self.activation_table['linear4'] = z4.detach().cpu().numpy()
-        z5 = self.linear5(z4)
-        z5 = self.act(z5)
-        self.activation_table['linear5'] = z5.detach().cpu().numpy()
-        out = self.output_layer(z5)
+        # self.pre_act_table['linear1'] = z1
+        z1.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'linear1'))
+        h1 = self.act(z1)
+        self.activation_table['linear1'] = h1.detach().cpu().numpy()
+        self.hidden_table['linear1'] = h1
+        z2 = self.linear2(h1)
+        # self.pre_act_table['linear2'] = z2
+        z2.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'linear2'))
+        h2 = self.act(z2)
+        self.activation_table['linear2'] = h2.detach().cpu().numpy()
+        self.hidden_table['linear2'] = h2
+        z3 = self.linear3(h2)
+        # self.pre_act_table['linear3'] = z3
+        z3.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'linear3'))
+        h3 = self.act(z3)
+        self.activation_table['linear3'] = h3.detach().cpu().numpy()
+        self.hidden_table['linear3'] = h3
+        z4 = self.linear4(h3)
+        # self.pre_act_table['linear4'] = z4
+        z4.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'linear4'))
+        h4 = self.act(z4)
+        self.activation_table['linear4'] = h4.detach().cpu().numpy()
+        self.hidden_table['linear4'] = h4
+        z5 = self.linear5(h4)
+        # self.pre_act_table['linear5'] = z5
+        z5.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'linear5'))
+        h5 = self.act(z5)
+        self.activation_table['linear5'] = h5.detach().cpu().numpy()
+        self.hidden_table['linear5'] = h5
+        out = self.output_layer(h5)
+        # self.pre_act_table['output_layer'] = out
+        out.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'output_layer'))
         out = self.softmax(out)
         return out
 
@@ -115,7 +134,11 @@ class GrowingMLP(nn.Module):
         self.params_state[layer_name + '.bias'][neuron_id] = 0
         return
 
-    def generate_neurons(self, rate):
+    def pre_activation_hook(self, grad, layer_name):
+        self.pre_act_table[layer_name] = grad
+        return grad
+
+    def generate_neurons(self, rate, data=None, target=None):
         # Divide phase: Randomly clone some neurons.
         # Shall we say the neurons "divide" in this case?
         # Goal: Add new row to the weight of the current layer
@@ -139,9 +162,10 @@ class GrowingMLP(nn.Module):
             # old_params.append(current_layer.bias)
             # old_params.append(next_layer.weight)
             # Randomly generate num_new_neurons neurons
+            """
+            # ***Random initialization***
             # Append row to new_w
             new_w_rows = np.random.rand(num_new_neurons, old_w.shape[1]) * 0.01
-            # new_w_rows = np.zeros((num_new_neurons, old_w.shape[1]))
             if prev_layer_name is not None:
                 new_w_rows = new_w_rows * self.params_state[prev_layer_name + '.bias'].detach().cpu().numpy()
             new_w = np.append(old_w, new_w_rows, axis=0)
@@ -153,6 +177,30 @@ class GrowingMLP(nn.Module):
             # for frozen neurons.
             # Once a neuron is frozen, no gradient should flow through it
             new_next_w_cols = np.random.rand(old_next_w.shape[0], num_new_neurons) * 0.01
+            new_next_w_cols = new_next_w_cols * self.params_state[next_layer_name + '.bias'].detach().cpu().numpy()[:,
+                                                None]  # transpose
+            new_next_w = np.append(old_next_w, new_next_w_cols, axis=1)
+            """
+            # ***GradMax initialization***
+            new_w_rows = np.zeros((num_new_neurons, old_w.shape[1]))
+            if prev_layer_name is not None:
+                new_w_rows = new_w_rows * self.params_state[prev_layer_name + '.bias'].detach().cpu().numpy()
+            new_w = np.append(old_w, new_w_rows, axis=0)
+            new_b = np.append(old_b, np.zeros(num_new_neurons))
+            # Requirement: A backward pass using a batch of data from dev set, keep the gradients.
+            if prev_layer_name is None:
+                prev_h = data
+            else:
+                prev_h = self.hidden_table[prev_layer_name]
+            next_pre_act_grad = self.pre_act_table[next_layer_name]
+            objective = next_pre_act_grad.T @ prev_h
+            u, s, vh = torch.linalg.svd(objective)
+            new_next_w_cols = (u[:, :num_new_neurons] / torch.linalg.norm(s[:num_new_neurons]) * 1).detach().cpu().numpy()   # c = 1 for now
+            # logger.debug(f"Layer: {next_layer_name} | New cols: {new_next_w_cols}")
+            # In case the number of left-singular vectors is smaller than the number of neurons to be generated
+            if new_next_w_cols.shape[1] < num_new_neurons:
+                new_next_w_cols = np.tile(new_next_w_cols, (1, num_new_neurons // new_next_w_cols.shape[1]))
+                new_next_w_cols = np.append(new_next_w_cols, new_next_w_cols[:, :num_new_neurons-new_next_w_cols.shape[1]], axis=1)
             new_next_w_cols = new_next_w_cols * self.params_state[next_layer_name + '.bias'].detach().cpu().numpy()[:,
                                                 None]  # transpose
             new_next_w = np.append(old_next_w, new_next_w_cols, axis=1)
