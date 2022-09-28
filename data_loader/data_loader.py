@@ -37,7 +37,10 @@ class BaseDataset(Dataset):
         assert label in data.columns, f"'{label}' is not a column name of the given DataFrame."
         assert data[label].dtype in (np.int64, np.int32, np.int), "Class labels must be integers."
         if sampling_mode is None:
-            pass
+            label_values = data[label].unique()
+            logger.debug(f"Samples per class:")
+            for value in label_values:
+                logger.debug(f"Class: {value}.\tSamples: {len(data[data[label] == value])}")
         elif sampling_mode.lower() in ('u', 'under', 'us', 'under_sampling', 'under-sampling', 'under sampling'):
             logger.debug("Applying resampling mode: Under-sampling.")
             label_values = data[label].unique()
@@ -146,7 +149,9 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
                                                                           stratify=orig_labels)
         train_df = pd.concat([data_train, label_train], axis=1)
         test_df = pd.concat([data_test, label_test], axis=1)
+        logger.debug("Creating training set...")
         train_set = BaseDataset(data=train_df, label=label, sampling_mode=sampling_mode)
+        logger.debug("Creating test set...")
         test_set = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
         train_loader = DataLoader(dataset=train_set,
                                   batch_size=batch_size,
@@ -165,16 +170,19 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
         train_df = pd.concat([data_train, label_train], axis=1)
         dev_df = pd.concat([data_dev, label_dev], axis=1)
         test_df = pd.concat([data_test, label_test], axis=1)
+        logger.debug("Creating training set...")
         train_set = BaseDataset(data=train_df, label=label, sampling_mode=sampling_mode)
+        logger.debug("Creating validation set...")
         dev_set = BaseDataset(data=dev_df, label=label, sampling_mode=sampling_mode)
-        test_df = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
+        logger.debug("Creating test set...")
+        test_set = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
         train_loader = BaseDataLoader(dataset=train_set,
                                       batch_size=batch_size,
                                       shuffle=True)
         dev_loader = BaseDataLoader(dataset=dev_set,
                                     batch_size=batch_size,
                                     shuffle=True)
-        test_loader = BaseDataLoader(dataset=test_df,
+        test_loader = BaseDataLoader(dataset=test_set,
                                      batch_size=batch_size,
                                      shuffle=True)
         return train_loader, dev_loader, test_loader
