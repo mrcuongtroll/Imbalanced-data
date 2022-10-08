@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import precision_recall_curve, auc, classification_report
+from prettytable import PrettyTable
 import logging
 
 
@@ -60,3 +61,17 @@ def plot_pr_curve(model: nn.Module, test_dataset: Dataset, ax=None, title=None, 
         ax.set_ylabel('Precision', size=13)
         ax.set_xlabel('Recall', size=13)
     return line, area_under_the_curve
+
+
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        params = parameter.numel()
+        table.add_row([name, params])
+        total_params += params
+    # print(table)
+    # print(f"Total Trainable Params: {total_params}")
+    return total_params, table

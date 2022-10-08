@@ -5,6 +5,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import logging
+import math
+
+
+# Constants
+UNDER_SAMPLING = ('u', 'under', 'us', 'under_sampling', 'under-sampling', 'under sampling')
+OVER_SAMPLING = ('o', 'over', 'os', 'over_sampling', 'over-sampling', 'over sampling')
 
 
 # Logging
@@ -41,7 +47,7 @@ class BaseDataset(Dataset):
             logger.debug(f"Samples per class:")
             for value in label_values:
                 logger.debug(f"Class: {value}.\tSamples: {len(data[data[label] == value])}")
-        elif sampling_mode.lower() in ('u', 'under', 'us', 'under_sampling', 'under-sampling', 'under sampling'):
+        elif sampling_mode.lower() in UNDER_SAMPLING:
             logger.debug("Applying resampling mode: Under-sampling.")
             label_values = data[label].unique()
             # Find the minimum number of samples from a class
@@ -49,13 +55,15 @@ class BaseDataset(Dataset):
             for value in label_values:
                 if len(data[data[label] == value]) < min_count:
                     min_count = len(data[data[label] == value])
-            logger.debug(f"Samples per class: {min_count}.")
+            logger.debug("Samples per class: ")
             # Resample so that every class has the same number of sample as min_count
             classes = []
             for value in label_values:
-                classes.append(data[data[label] == value].sample(frac=min_count/len(data[data[label] == value])))
+                new_class_subset = data[data[label] == value].sample(frac=min_count/len(data[data[label] == value]))
+                logger.debug(f"Class: {value}.\tSamples: {len(new_class_subset[new_class_subset[label] == value])}")
+                classes.append(new_class_subset)
             data = pd.concat(classes)
-        elif sampling_mode.lower() in ('o', 'over', 'os', 'over_sampling', 'over-sampling', 'over sampling'):
+        elif sampling_mode.lower() in OVER_SAMPLING:
             logger.debug("Applying resampling mode: Over-sampling.")
             label_values = data[label].unique()
             # Find the maximum number of samples from a class
@@ -63,11 +71,13 @@ class BaseDataset(Dataset):
             for value in label_values:
                 if len(data[data[label] == value]) > max_count:
                     max_count = len(data[data[label] == value])
-            logger.debug(f"Samples per class: {max_count}.")
+            logger.debug("Samples per class: ")
             # Resample so that every class has the same number of sample as max_count
             classes = []
             for value in label_values:
-                classes.append(data[data[label] == value] * round(max_count / len(data[data[label] == value])))
+                new_class_subset = pd.concat([data[data[label] == value]] * round(max_count / len(data[data[label] == value])))
+                logger.debug(f"Class: {value}.\tSamples: {len(new_class_subset[new_class_subset[label] == value])}")
+                classes.append(new_class_subset)
             data = pd.concat(classes)
         else:
             raise ValueError("Invalid resampling method. Please choose either over-sampling, under-sampling, or None.")
@@ -119,8 +129,8 @@ class BaseDataLoader(DataLoader):
 
 
 # Functions
-def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_size=64, sampling_mode=None,
-                  copy=True):
+def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_size=64,
+                  sampling_mode=None, return_dframe=False, copy=True, num_workers=0):
     """
     This function takes a pandas DataFrame as input and return train/dev/test splits as PyTorch DataLoaders.
     This should be useful if you only have pre-split dataset.
@@ -131,12 +141,15 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
                     the DataFrame into training, development and test sets according to the ratios.
     :param batch_size: type: int (Required. Default: 64). The batch size to create data loaders
     :param sampling_mode: type: str (Optional). See BaseDataset.sampling_mode.
+    :param return_dframe: type: bool (Required. Default: False). If set to True, this function will return the datasets
+                          as pd.DataFrame's. Otherwise, it will return PyTorch DataLoader's.
     :param copy: type: boolean (Required. Default: True). Whether to copy the input DataFrame or to modify it inplace.
-    :return: (train: torch.DataLoader, dev: torch.DataLoader, test: DataLoader) or
-             (train: torch.DataLoader, test: torch.DataLoader)
+    :param num_workers: type: int (Required. Default: 0). The number of workers for each dataloaders.
+    :return: (train: DataLoader, dev: DataLoader, test: DataLoader) or
+             (train: DataLoader, test: DataLoader)
     """
     assert len(splits) == 3 or len(splits) == 2, "splits must be a tuple of either 2 or 3 floats."
-    assert abs(sum(splits) - 1.0) <= 1e-8, "The splitting ratios must add up to 1."
+    assert math.isclose(sum(splits), 1.0), "The splitting ratios must add up to 1."
     assert label in data.columns, f"'{label}' is not a column of the DataFrame."
     if copy:
         data = data.copy()
@@ -149,16 +162,20 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
                                                                           stratify=orig_labels)
         train_df = pd.concat([data_train, label_train], axis=1)
         test_df = pd.concat([data_test, label_test], axis=1)
+        if return_dframe:
+            return train_df, test_df
         logger.debug("Creating training set...")
         train_set = BaseDataset(data=train_df, label=label, sampling_mode=sampling_mode)
         logger.debug("Creating test set...")
         test_set = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
         train_loader = DataLoader(dataset=train_set,
                                   batch_size=batch_size,
-                                  shuffle=True)
+                                  shuffle=True,
+                                  num_workers=num_workers)
         test_loader = DataLoader(dataset=test_set,
                                  batch_size=batch_size,
-                                 shuffle=True)
+                                 shuffle=True,
+                                 num_workers=num_workers)
         return train_loader, test_loader
     elif len(splits) == 3:
         logger.info(f"Splitting train/dev/test sets. Ratio: {splits}.")
@@ -170,6 +187,8 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
         train_df = pd.concat([data_train, label_train], axis=1)
         dev_df = pd.concat([data_dev, label_dev], axis=1)
         test_df = pd.concat([data_test, label_test], axis=1)
+        if return_dframe:
+            return train_df, dev_df, test_df
         logger.debug("Creating training set...")
         train_set = BaseDataset(data=train_df, label=label, sampling_mode=sampling_mode)
         logger.debug("Creating validation set...")
@@ -178,11 +197,36 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
         test_set = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
         train_loader = BaseDataLoader(dataset=train_set,
                                       batch_size=batch_size,
-                                      shuffle=True)
+                                      shuffle=True,
+                                      num_workers=num_workers)
         dev_loader = BaseDataLoader(dataset=dev_set,
                                     batch_size=batch_size,
-                                    shuffle=True)
+                                    shuffle=True,
+                                    num_workers=num_workers)
         test_loader = BaseDataLoader(dataset=test_set,
                                      batch_size=batch_size,
-                                     shuffle=True)
+                                     shuffle=True,
+                                     num_workers=num_workers)
         return train_loader, dev_loader, test_loader
+
+
+def make_dataloader(data: pd.DataFrame, label: str, batch_size=64, sampling_mode=None, copy=True, num_workers=0):
+    """
+    This function takes a pd.DataFrame and return a PyTorch DataLoader
+    :param data: type: pd.DataFrame (Required). A DataFrame containing both data and labels.
+    :param label: type: str (Required). The name of the label column.
+    :param batch_size: type: int (Required. Default: 64). The batch size to create data loaders
+    :param sampling_mode: type: str (Optional). See BaseDataset.sampling_mode.
+    :param copy: type: boolean (Required. Default: True). Whether to copy the input DataFrame or to modify it inplace.
+    :param num_workers: type: int (Required. Default: 0). The number of workers for each dataloaders.
+    :return: DataLoader object
+    """
+    if copy:
+        data = data.copy()
+    logger.debug("Creating dataset...")
+    dataset = BaseDataset(data=data, label=label, sampling_mode=sampling_mode)
+    data_loader = BaseDataLoader(dataset=dataset,
+                                 batch_size=batch_size,
+                                 shuffle=True,
+                                 num_workers=num_workers)
+    return data_loader
