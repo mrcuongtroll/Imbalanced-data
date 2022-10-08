@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import logging
 import model.modules as modules
+import math
 
 
 # Logging
@@ -22,6 +23,34 @@ logger = logging.getLogger(name=__name__)
 
 
 # Classes
+class GrowingNN(nn.Module):
+    def __init__(self, input_size, output_size, device='cuda'):
+        super(GrowingNN, self).__init__()
+
+    def forward(self):
+        return
+
+    def init_param_state(self):
+        return
+
+    def freeze_backward_hook(self):
+        return
+
+    def register_freeze_hook(self):
+        return
+
+    def freeze_neuron(self):
+        return
+
+    def pre_activation_hook(self):
+        return
+
+    def generate_neurons(self):
+        return
+
+    def freeze(self):
+        return
+
 class GrowingMLP(nn.Module):
 
     def __init__(self, input_size, output_size, device='cuda'):
@@ -252,8 +281,7 @@ class GrowingMLP(nn.Module):
         self.eval()
         num_frozen = 0
         with torch.no_grad():
-            # TODO: check which neurons have very high activation for only a given
-            # class, freeze them
+            # TODO: check which neurons have very high activation for only a given class, freeze them
             # Suppose we have a dev set
             label_count = {}
             for label in labels:
@@ -278,6 +306,13 @@ class GrowingMLP(nn.Module):
                             activation_by_label[layer][index][label] += np.sum(activation[:, index] * label_mask)
             for layer in self.layer_names:
                 for index in range(len(self.activation_table[layer][0])):
+                    # Don't freeze already frozen neurons:
+                    if math.isclose(self.params_state[f'{layer}.bias'][index], 0.0):
+                        # logger.debug(f"{layer}: {index}")
+                        # for label in label_count.keys():
+                        #     if label_count[label] > 0:
+                        #         logger.debug(f"{label}: {activation_by_label[layer][index][label] / label_count[label]}")
+                        continue
                     # Check for every label
                     for label in label_count.keys():
                         if label_count[label] > 0:
@@ -297,3 +332,38 @@ class GrowingMLP(nn.Module):
                                 self.num_unfrozen_neurons -= 1
                                 num_frozen += 1
         return num_frozen
+
+
+class GrowingCNN(nn.Module):
+
+    def __init__(self, in_channels, out_size, device='cuda'):
+        super(GrowingCNN, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, 64, (3, 3))
+        self.conv2 = nn.Conv2d(64, 128, (3, 3))
+        self.conv3 = nn.Conv2d(128, 64, (3, 3))
+        self.act = modules.CustomReLU()
+        self.maxpool = nn.MaxPool2d(2, 2)
+        self.softmax = nn.LogSoftmax(dim=1)
+        # self.linear = nn.Linear(???, out_size)
+        self.out_layer = nn.Conv2d(64, 2, (4, 4))
+        return
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.act(out)
+        out = self.maxpool(out)
+        out = self.conv2(out)
+        out = self.act(out)
+        out = self.maxpool(out)
+        out = self.conv3(out)
+        out = self.act(out)
+        out = self.out_layer(out)
+        # out = self.maxpool(out)
+        # out = self.conv4(out)
+        # out = self.act(out)
+        # out = self.maxpool(out)
+        # out = self.conv5(out)
+        out = out.reshape(out.size(0), -1)
+        # out = self.linear(out)
+        out = self.softmax(out)
+        return out
