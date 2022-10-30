@@ -4,13 +4,14 @@ import logging
 import argparse
 import pandas as pd
 import numpy as np
+from matplotlib import pyplot as plt
 import os
 import dill
 import torchvision.datasets as datasets
 from data_loader.data_loader import make_datasets, make_dataloader, UNDER_SAMPLING, OVER_SAMPLING
 from model.GrowingNN import GrowingMLP
 from trainer.trainer import Trainer
-from utils.utils import test_report, count_parameters
+from utils.utils import test_report, count_parameters, plot_activation
 
 
 # Constants
@@ -88,9 +89,13 @@ def main(args):
     input_size = len(data.columns) - 1  # Minus the label column
     output_size = len(data[args.label_col].unique())
     logger.info(f"Creating model with input_size={input_size}, output_size={output_size}")
-    model = GrowingMLP(input_size, output_size, device=args.device)
-    logger.info("Initializing parameters states")
-    model.init_params_state()
+    if args.proposed_method:
+        model = GrowingMLP(input_size, output_size, device=args.device, growing_method='random')
+        logger.info("Initializing parameters states")
+        model.init_params_state()
+    else:
+        logger.info("Not applying proposed method. Initializing networks with higher params count.")
+        model = GrowingMLP(input_size, output_size, hidden_sizes=(198, 394, 789, 394, 198))
     if os.path.exists(os.path.join(CHECKPOINT, settings_name, "checkpoint.th")):
         model = torch.load(os.path.join(CHECKPOINT, settings_name, "checkpoint.th"), pickle_module=dill)
     criterion = torch.nn.NLLLoss()
@@ -108,14 +113,52 @@ def main(args):
     resampling_epochs = 30*epochs if args.resampling_mode in UNDER_SAMPLING else epochs
     params, params_table = count_parameters(model)
     logger.debug(f"Total number of parameters: {params}.\n{params_table}")
-    trainer.train(train_loader=train_loader_r, dev_loader=dev_loader_r, gen_rate=args.gen_rate,
-                  criterion=criterion, epochs=resampling_epochs, num_prints=args.num_prints,
-                  high=args.high, low=args.low)
-    trainer.train(train_loader=train_loader, dev_loader=dev_loader, gen_rate=args.gen_rate,
-                  criterion=criterion, epochs=epochs, num_prints=args.num_prints, high=args.high, low=args.low)
+    if args.proposed_method:
+        trainer.train(train_loader=train_loader_r, dev_loader=dev_loader_r, gen_rate=args.gen_rate,
+                      criterion=criterion, epochs=resampling_epochs, num_prints=args.num_prints,
+                      high=args.high, low=args.low)
+        trainer.train(train_loader=train_loader, dev_loader=dev_loader, gen_rate=args.gen_rate,
+                      criterion=criterion, epochs=epochs, num_prints=args.num_prints, high=args.high, low=args.low)
+    else:
+        trainer.train(train_loader=train_loader_r, dev_loader=dev_loader_r, gen_rate=args.gen_rate,
+                      criterion=criterion, epochs=resampling_epochs, num_prints=args.num_prints,
+                      high=args.high, low=args.low, freeze_neurons=False)
+        # trainer.train(train_loader=train_loader, dev_loader=dev_loader, gen_rate=args.gen_rate,
+        #               criterion=criterion, epochs=epochs, num_prints=args.num_prints, high=args.high, low=args.low,
+        #               freeze_neurons=False)
     params, params_table = count_parameters(model)
     logger.debug(f"Total number of parameters: {params}.\n{params_table}")
     test_report(model, test_loader)
+
+    # Activation plot
+    with torch.no_grad():
+        test_dataset = test_loader.dataset
+        samples = []
+        target = []
+        count = 0
+        target_label = 0
+        for sample, label in test_dataset:
+            if target_label == 2:
+                break
+            if label == target_label:
+                out = model(sample.unsqueeze(0).to(args.device))
+                pred = out.argmax(dim=1)
+                if pred.item() == label.item(): # and out.exp().max() >= 0.95:
+                    samples.append(sample.detach().cpu().numpy())
+                    target.append(out.exp()[0, 1].item())
+                    count += 1
+            if count == 10:
+                target_label += 1
+                count = 0
+        samples = torch.tensor(np.array(samples), dtype=torch.float)
+        target = torch.tensor(np.array(target), dtype=torch.float)
+        # data, target = next(iter(test_loader))
+        samples, target = samples.to(args.device), target.to(args.device)
+        pred = model(samples)
+        target = np.around(target.detach().cpu().numpy(), decimals=3)
+        plot_activation(model.activation_table, target,
+                        save_path=os.path.join(CHECKPOINT, settings_name, 'activation.png'))
+        del data, target, pred
     # logger.debug(f"linear4's weight: {model.linear4.weight}")
     # logger.debug(f"linear4's bias: {model.linear4.bias}")
     # logger.debug(f"linear4's weight mask: {model.params_state['linear4.weight']}")
@@ -150,6 +193,10 @@ if __name__ == '__main__':
                                                                           "that the data will be loaded in the main "
                                                                           "process."
                                                                           "Default: 0")
+    parser.add_argument("--proposed_method", default=True, action='store_true',
+                        help="To apply the proposed method.")
+    parser.add_argument("--no_proposed_method", dest="proposed_method", action='store_false',
+                        help="Do not apply the proposed method.")
     args = parser.parse_args()
 
     args_var = vars(args).copy()
@@ -160,9 +207,12 @@ if __name__ == '__main__':
     file_handler = logging.FileHandler(os.path.join(LOGS, f'{settings_name}.log'))
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)
+    if not os.path.exists(os.path.join(CHECKPOINT, settings_name)):
+        os.makedirs(os.path.join(CHECKPOINT, settings_name))
     file_handler2 = logging.FileHandler(os.path.join(CHECKPOINT, settings_name, "log.log"))
     file_handler2.setFormatter(formatter)
     file_handler2.setLevel(logging.DEBUG)
+    logger.addHandler(file_handler2)
     logger.addHandler(file_handler)
     logger.info(f"====================================================================================================="
                 f"\nGrowing Neural Network experiment. "

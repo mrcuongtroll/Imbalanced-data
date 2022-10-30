@@ -128,6 +128,9 @@ class BaseDataLoader(DataLoader):
         return
 
 
+# TODO: Create loaders for MNIST and test training loop
+
+
 # Functions
 def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_size=64,
                   sampling_mode=None, return_dframe=False, copy=True, num_workers=0):
