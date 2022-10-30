@@ -158,6 +158,6 @@ class Trainer:
                        os.path.join(CHECKPOINT, self.checkpoint_name, "trainer.th"),
                        pickle_module=dill)
             logger.info(f'Summary for epoch {epoch + 1} '
-                        f'| TRAIN LOSS = {train_loss:.5f} | DEV LOSS = {dev_loss:.5f} '
+                        f'| TRAIN LOSS = {train_loss:.5f} | VALID LOSS = {dev_loss:.5f} '
                         f'| BEST VALID LOSS: {best_dev_loss:.5f}\n')
         return

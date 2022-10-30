@@ -30,21 +30,26 @@ def test_report(model: torch.nn.Module, test_loader: DataLoader, device='cuda'):
     logger.info('\n'+classification_report(y_true, y_pred, digits=4))
 
 
-def plot_activation(activations, label):
+def plot_activation(activations, label, save_path=None):
     def plot_layer_activation(layer_activation, ax, layer_name=None):
         if len(layer_activation.shape) == 1:
             ax.bar(range(len(layer_activation)), layer_activation, color='blue')
         elif len(layer_activation.shape) == 2:
-            ax.imshow(layer_activation, cmap='Blues')
+            ax.imshow(layer_activation, cmap='Blues', vmin=0, vmax=1.5)
         ax.set_title(layer_name)
         return
-    fig, axes = plt.subplots(5, figsize=(20,20), tight_layout=True)
+    fig, axes = plt.subplots(5, figsize=(20, 20), tight_layout=True)
     fig.suptitle(label)
     if isinstance(activations, dict):
+        count = 0
         for layer in activations.keys():
-            plot_layer_activation(activations[layer], axes[layer], layer_name=f'Layer: {layer}')
+            plot_layer_activation(activations[layer], axes[count], layer_name=f'Layer: {layer}')
+            count += 1
     else:
         plot_layer_activation(activations, axes[0])
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+    plt.show()
 
 
 def plot_pr_curve(model: nn.Module, test_dataset: Dataset, ax=None, title=None, device='cuda'):
