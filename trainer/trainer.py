@@ -6,29 +6,16 @@ import logging
 import copy
 import os
 import dill
+from definitions import *
 
 
 # Checkpoint path
-CHECKPOINT = './checkpoints'
-if not os.path.exists(os.path.abspath(CHECKPOINT)):
-    os.makedirs(os.path.abspath(CHECKPOINT))
+if not os.path.exists(os.path.abspath(CHECKPOINT_DIR)):
+    os.makedirs(os.path.abspath(CHECKPOINT_DIR))
 
 
 # Logging
 logger = logging.getLogger(name=__name__)
-
-
-# logger.propagate = False
-# stream_handler = logging.StreamHandler()
-# file_handler = logging.FileHandler('./logs/log_old.log')
-# formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] - %(message)s')
-# stream_handler.setFormatter(formatter)
-# stream_handler.setLevel(logging.INFO)
-# file_handler.setFormatter(formatter)
-# file_handler.setLevel(logging.DEBUG)
-# logger.addHandler(stream_handler)
-# logger.addHandler(file_handler)
-# logger.setLevel(logging.NOTSET)
 
 
 # Classes
@@ -45,8 +32,8 @@ class Trainer:
         self.dev_loss_history = []
         self.iter_milestones = []
         self.checkpoint_name = checkpoint_name
-        if not os.path.exists(os.path.join(CHECKPOINT, self.checkpoint_name)):
-            os.makedirs(os.path.join(CHECKPOINT, self.checkpoint_name))
+        if not os.path.exists(os.path.join(CHECKPOINT_DIR, self.checkpoint_name)):
+            os.makedirs(os.path.join(CHECKPOINT_DIR, self.checkpoint_name))
         return
 
     def train(self, train_loader, criterion, dev_loader, epochs=100, num_prints=10,
@@ -101,7 +88,8 @@ class Trainer:
                     #     gen_rate -= 0.00025
                 else:
                     logger.info('Nothing has been frozen for this epoch')
-                if (epoch + 1) % 25 == 0 or self.model.num_unfrozen_neurons / self.model.num_neurons <= generation_threshold:
+                if (epoch + 1) % 5 == 0 or self.model.num_unfrozen_neurons / self.model.num_neurons <= generation_threshold:
+                    # Was 25 epochs
                     dev_iter = iter(dev_loader)
                     data, target = next(dev_iter)
                     data, target = data.to(self.device), target.to(self.device)
@@ -147,17 +135,22 @@ class Trainer:
                 logger.info(f"New best validation loss: {best_dev_loss:.5f}.")
                 # best_model = copy.deepcopy(self.model)
                 # Save checkpoint
-                best_model_path = os.path.join(CHECKPOINT, self.checkpoint_name, "best.th")
+                best_model_path = os.path.join(CHECKPOINT_DIR, self.checkpoint_name, "best.th")
                 torch.save(self.model, best_model_path, pickle_module=dill)
             # Saving
-            checkpoint_path = os.path.join(CHECKPOINT, self.checkpoint_name, "checkpoint.th")
+            checkpoint_path = os.path.join(CHECKPOINT_DIR, self.checkpoint_name, "checkpoint.th")
             torch.save(self.model, checkpoint_path, pickle_module=dill)
             torch.save({'optimizer': self.optimizer.state_dict(),
                         'train_loss': self.train_loss_history,
                         'dev_loss': self.dev_loss_history},
-                       os.path.join(CHECKPOINT, self.checkpoint_name, "trainer.th"),
+                       os.path.join(CHECKPOINT_DIR, self.checkpoint_name, "trainer.th"),
                        pickle_module=dill)
             logger.info(f'Summary for epoch {epoch + 1} '
                         f'| TRAIN LOSS = {train_loss:.5f} | VALID LOSS = {dev_loss:.5f} '
                         f'| BEST VALID LOSS: {best_dev_loss:.5f}\n')
         return
+
+
+# Test
+if __name__ == '__main__':
+    print(CHECKPOINT_DIR)

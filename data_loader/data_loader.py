@@ -1,11 +1,23 @@
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torchvision
+import torchvision.datasets as datasets
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import logging
 import math
+import os
+import json
+from definitions import *
+
+
+# datasets path
+if not os.path.exists(os.path.abspath(DATASETS_DIR)):
+    os.makedirs(os.path.abspath(DATASETS_DIR))
+if not os.path.exists(os.path.abspath(DATASETS_METADATA_DIR)):
+    os.makedirs(os.path.abspath(DATASETS_METADATA_DIR))
 
 
 # Constants
@@ -15,21 +27,10 @@ OVER_SAMPLING = ('o', 'over', 'os', 'over_sampling', 'over-sampling', 'over samp
 
 # Logging
 logger = logging.getLogger(name=__name__)
-# logger.propagate = False
-# stream_handler = logging.StreamHandler()
-# file_handler = logging.FileHandler('./logs/log_old.log')
-# formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] - %(message)s')
-# stream_handler.setFormatter(formatter)
-# stream_handler.setLevel(logging.INFO)
-# file_handler.setFormatter(formatter)
-# file_handler.setLevel(logging.DEBUG)
-# logger.addHandler(stream_handler)
-# logger.addHandler(file_handler)
-# logger.setLevel(logging.NOTSET)
 
 
 # Classes
-class BaseDataset(Dataset):
+class DFDataset(Dataset):
     def __init__(self, data: pd.DataFrame, label: str, sampling_mode: str = None):
         """
         Take a pandas DataFrame and create a pytorch Dataset. The Dataset can be resampled to balance the classes.
@@ -39,7 +40,7 @@ class BaseDataset(Dataset):
         :param sampling_mode: type: str. (Optional) Can be either over-sampling or under-sampling. If not given, no
                               resampling is applied.
         """
-        super(BaseDataset, self).__init__()
+        super(DFDataset, self).__init__()
         assert label in data.columns, f"'{label}' is not a column name of the given DataFrame."
         assert data[label].dtype in (np.int64, np.int32, np.int), "Class labels must be integers."
         if sampling_mode is None:
@@ -114,6 +115,75 @@ class BaseDataset(Dataset):
         return class_count
 
 
+class TVDataset(Dataset):
+
+    def __init__(self, data: type(datasets.VisionDataset), train: bool = True, flatten_images: bool = False,
+                 sampling_mode: str = None, make_imbalanced=True,
+                 classes=(0, 1), imbalanced_ratio: float = 0.05, minority_classes=(1,)):
+        """
+        Take a torchvision VisionDataset class name and create a pytorch Dataset. The dataset will be made imbalanced
+        and can then be further resampled to balance the (artificially imbalanced) classes.
+        :param data: type: type(torchvision.datasets.VisionDataset). (Required) A PyTorch built-in vision dataset that
+                     will be downloaded and customized.
+        :param train: type: bool. (Required, default=True). Whether to download the training set or the test set.
+        :param flatten_images: type: bool. (Required, default=False) Whether to flatten images in the vision dataset or
+                               not.
+        :param sampling_mode: type: str. (Optional) Can be either over-sampling or under-sampling. If not given, no
+                              resampling is applied.
+        :param classes: type: tuple(int). (Required, default=(0, 1)) The classes to read from the dataset
+        :param imbalanced_ratio: type float. (Required, default=0.05) The imbalance ratio, i.e. the number of minority
+                                 class samples divided by the number of majority class samples.
+        :param minority_classes: type: tuple(int). (Required, default=(1,)) The minority classes.
+        """
+        super(TVDataset, self).__init__()
+        assert os.path.exists(os.path.join(DATASETS_METADATA_DIR, 'mnist.json')), "Metadata for MNIST not found. " \
+                                                                                  "Please create one or run " \
+                                                                                  "python get_data.py -d=mnist"
+        with open(os.path.join(DATASETS_METADATA_DIR, 'mnist.json'), 'r') as f:
+            metadata = json.load(f)
+        self.dataset = data(
+            root=DATASETS_DIR, train=train, download=True,
+            transform=torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                # torchvision.transforms.Normalize((0.1307,), (0.3081,))
+            ])
+        )
+        self.imbalanced = make_imbalanced
+        self.classes = classes                      # Dunno what to do with this yet
+        self.minority_classes = minority_classes    # Dunno what to do with this yet
+        self.imbalanced_ratio = imbalanced_ratio    # Dunno what to do with this yet
+        dset = 'train' if train else 'test'
+        num_minor_samples = round(imbalanced_ratio * max([metadata["num_samples_per_class"][dset][str(c)]
+                                                          for c in classes if c not in minority_classes]))
+        # Get indices from the original dataset to create artificially imbalanced dataset
+        self.data_indices = []   # This list stores indices of the samples to actually be used.
+        self.sample_count = {label: 0 for label in classes}     # used to limit the number of minority samples
+        for idx in range(len(self.dataset)):
+            label = self.dataset[idx][1]
+            if label in classes:
+                if label in minority_classes and self.sample_count[label] >= num_minor_samples and self.imbalanced:
+                    continue
+                self.data_indices.append(idx)
+                self.sample_count[label] += 1
+        self._len = len(self.data_indices)
+        self.flatten_images = flatten_images
+        self.sampling_mode = sampling_mode
+
+    def __len__(self):
+        # return len(self.data_indices)   # O(n) I guess...
+        return self._len   # O(1)
+
+    def __getitem__(self, idx):
+        if idx >= self._len:
+            raise IndexError(f"Index out of range for length {self._len}")
+        true_idx = self.data_indices[idx]
+        data, target = self.dataset[true_idx]
+        if self.flatten_images:
+            return torch.flatten(data), torch.tensor(target, dtype=torch.long)
+        else:
+            return data, torch.tensor(target, dtype=torch.long)
+
+
 class BaseDataLoader(DataLoader):
 
     def __init__(self, dataset: Dataset, **kwargs):
@@ -128,12 +198,50 @@ class BaseDataLoader(DataLoader):
         return
 
 
-# TODO: Create loaders for MNIST and test training loop
-
-
 # Functions
-def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_size=64,
-                  sampling_mode=None, return_dframe=False, copy=True, num_workers=0):
+def make_tv_dataloaders(data: type(datasets.VisionDataset), dev_split: float = None, batch_size: int = 64,
+                        flatten_images: bool = False, sampling_mode: str = None, num_workers: int = 0):
+    """
+    This function takes a dataset class name from torchvision.datasets and return data loaders of train, dev and test
+    splits of said dataset.
+    :param data: type: type(torchvision.datasets.VisionDataset). (Required) A PyTorch built-in vision dataset that will
+                 be downloaded and customized.
+    :param dev_split: type: float. (Optional) The ratio to split the training set into a new training set and a
+                      validation set. If not given, the training set will not be split.
+    :param batch_size: type: int. (Required, default=64) The batch size of the data loaders.
+    :param flatten_images: type: bool. (Required, default=False) Whether or not to flatten the images.
+    :param sampling_mode: type: str. (Optional) Can be either over-sampling or under-sampling. If not given, no
+                          resampling is applied.
+    :param num_workers: type: int. (Required, default=0) The parameter num_workers to be passed to torch DataLoader.
+    :return: (train: DataLoader, dev: DataLoader, test: DataLoader) or
+             (train: DataLoader, test: DataLoader)
+    """
+    train_set = TVDataset(data, train=True, flatten_images=flatten_images, sampling_mode=sampling_mode)
+    dev_set = None
+    if dev_split is not None:
+        train_set, dev_set = train_test_split(train_set, test_size=dev_split)
+    test_set = TVDataset(data, train=False, flatten_images=flatten_images, sampling_mode=sampling_mode,
+                         make_imbalanced=False)
+    train_loader = DataLoader(dataset=train_set,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=num_workers)
+    test_loader = DataLoader(dataset=test_set,
+                             batch_size=batch_size,
+                             shuffle=True,
+                             num_workers=num_workers)
+    if dev_set is not None:
+        dev_loader = DataLoader(dataset=dev_set,
+                                batch_size=batch_size,
+                                shuffle=True,
+                                num_workers=num_workers)
+        return train_loader, dev_loader, test_loader
+    else:
+        return train_loader, test_loader
+    
+
+def make_df_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_size=64,
+                     sampling_mode=None, return_dframe=False, copy=True, num_workers=0):
     """
     This function takes a pandas DataFrame as input and return train/dev/test splits as PyTorch DataLoaders.
     This should be useful if you only have pre-split dataset.
@@ -143,7 +251,7 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
                     split the DataFrame into training and test sets according to the ratios. If len(splits)==3 then split
                     the DataFrame into training, development and test sets according to the ratios.
     :param batch_size: type: int (Required. Default: 64). The batch size to create data loaders
-    :param sampling_mode: type: str (Optional). See BaseDataset.sampling_mode.
+    :param sampling_mode: type: str (Optional). See DFDataset.sampling_mode.
     :param return_dframe: type: bool (Required. Default: False). If set to True, this function will return the datasets
                           as pd.DataFrame's. Otherwise, it will return PyTorch DataLoader's.
     :param copy: type: boolean (Required. Default: True). Whether to copy the input DataFrame or to modify it inplace.
@@ -168,9 +276,9 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
         if return_dframe:
             return train_df, test_df
         logger.debug("Creating training set...")
-        train_set = BaseDataset(data=train_df, label=label, sampling_mode=sampling_mode)
+        train_set = DFDataset(data=train_df, label=label, sampling_mode=sampling_mode)
         logger.debug("Creating test set...")
-        test_set = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
+        test_set = DFDataset(data=test_df, label=label, sampling_mode=sampling_mode)
         train_loader = DataLoader(dataset=train_set,
                                   batch_size=batch_size,
                                   shuffle=True,
@@ -193,11 +301,11 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
         if return_dframe:
             return train_df, dev_df, test_df
         logger.debug("Creating training set...")
-        train_set = BaseDataset(data=train_df, label=label, sampling_mode=sampling_mode)
+        train_set = DFDataset(data=train_df, label=label, sampling_mode=sampling_mode)
         logger.debug("Creating validation set...")
-        dev_set = BaseDataset(data=dev_df, label=label, sampling_mode=sampling_mode)
+        dev_set = DFDataset(data=dev_df, label=label, sampling_mode=sampling_mode)
         logger.debug("Creating test set...")
-        test_set = BaseDataset(data=test_df, label=label, sampling_mode=sampling_mode)
+        test_set = DFDataset(data=test_df, label=label, sampling_mode=sampling_mode)
         train_loader = BaseDataLoader(dataset=train_set,
                                       batch_size=batch_size,
                                       shuffle=True,
@@ -213,13 +321,13 @@ def make_datasets(data: pd.DataFrame, label: str, splits=(0.7, 0.2, 0.1), batch_
         return train_loader, dev_loader, test_loader
 
 
-def make_dataloader(data: pd.DataFrame, label: str, batch_size=64, sampling_mode=None, copy=True, num_workers=0):
+def make_df_dataloader(data: pd.DataFrame, label: str, batch_size=64, sampling_mode=None, copy=True, num_workers=0):
     """
     This function takes a pd.DataFrame and return a PyTorch DataLoader
     :param data: type: pd.DataFrame (Required). A DataFrame containing both data and labels.
     :param label: type: str (Required). The name of the label column.
     :param batch_size: type: int (Required. Default: 64). The batch size to create data loaders
-    :param sampling_mode: type: str (Optional). See BaseDataset.sampling_mode.
+    :param sampling_mode: type: str (Optional). See DFDataset.sampling_mode.
     :param copy: type: boolean (Required. Default: True). Whether to copy the input DataFrame or to modify it inplace.
     :param num_workers: type: int (Required. Default: 0). The number of workers for each dataloaders.
     :return: DataLoader object
@@ -227,7 +335,7 @@ def make_dataloader(data: pd.DataFrame, label: str, batch_size=64, sampling_mode
     if copy:
         data = data.copy()
     logger.debug("Creating dataset...")
-    dataset = BaseDataset(data=data, label=label, sampling_mode=sampling_mode)
+    dataset = DFDataset(data=data, label=label, sampling_mode=sampling_mode)
     data_loader = BaseDataLoader(dataset=dataset,
                                  batch_size=batch_size,
                                  shuffle=True,
