@@ -9,17 +9,6 @@ import math
 
 # Logging
 logger = logging.getLogger(name=__name__)
-# logger.propagate = False
-# stream_handler = logging.StreamHandler()
-# file_handler = logging.FileHandler('./logs/log_old.log')
-# formatter = logging.Formatter('[%(asctime)s][%(name)s][%(levelname)s] - %(message)s')
-# stream_handler.setFormatter(formatter)
-# stream_handler.setLevel(logging.INFO)
-# file_handler.setFormatter(formatter)
-# file_handler.setLevel(logging.DEBUG)
-# logger.addHandler(stream_handler)
-# logger.addHandler(file_handler)
-# logger.setLevel(logging.NOTSET)
 
 
 # Classes
@@ -370,8 +359,10 @@ class GrowingMLP(nn.Module):
 
 class GrowingCNN(nn.Module):
 
-    def __init__(self, input_size, input_img_size, out_size, device='cuda'):
+    def __init__(self, input_size, out_size, input_img_size, growing_method='random', device='cuda'):
         super(GrowingCNN, self).__init__()
+        assert growing_method.lower() in ('random', 'gradmax'), "Growing method must be either 'random' or 'gradmax'"
+        self.growing_method = growing_method
         self.device = device
         self.activation_table = {}
         self.pre_act_grad_table = {}  # Used for GradMax

@@ -5,4 +5,15 @@
     <orderEntry type="jdk" jdkName="Python 3.8 (pythonProject) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
+  <component name="PyNamespacePackagesService">
+    <option name="namespacePackageFolders">
+      <list>
+        <option value="$MODULE_DIR$/trainer" />
+        <option value="$MODULE_DIR$/loggers" />
+        <option value="$MODULE_DIR$/model" />
+        <option value="$MODULE_DIR$/data_loader" />
+        <option value="$MODULE_DIR$/utils" />
+      </list>
+    </option>
+  </component>
 </module>
