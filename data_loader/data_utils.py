@@ -113,7 +113,7 @@ def get_cifar10():
             # torchvision.transforms.Normalize((0.1307,), (0.3081,))
         ])
     )
-    if not os.path.exists(os.path.join(DATASETS_METADATA_DIR, 'mnist.json')):
+    if not os.path.exists(os.path.join(DATASETS_METADATA_DIR, 'cifar10.json')):
         metad = {"type": "torchvisionDataset",
                  "num_features": 32 * 32,
                  "num_classes": 10,
