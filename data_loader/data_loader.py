@@ -117,7 +117,7 @@ class DFDataset(Dataset):
 
 class TVDataset(Dataset):
 
-    def __init__(self, data: type(datasets.VisionDataset), train: bool = True, flatten_images: bool = False,
+    def __init__(self, dataset_name: str, train: bool = True, flatten_images: bool = False,
                  sampling_mode: str = None, make_imbalanced=True,
                  classes=(0, 1), imbalanced_ratio: float = 0.05, minority_classes=(1,)):
         """
@@ -136,11 +136,12 @@ class TVDataset(Dataset):
         :param minority_classes: type: tuple(int). (Required, default=(1,)) The minority classes.
         """
         super(TVDataset, self).__init__()
-        assert os.path.exists(os.path.join(DATASETS_METADATA_DIR, 'mnist.json')), "Metadata for MNIST not found. " \
+        assert os.path.exists(os.path.join(DATASETS_METADATA_DIR, f'{dataset_name}.json')), "Metadata for MNIST not found. " \
                                                                                   "Please create one or run " \
                                                                                   "python get_data.py -d=mnist"
-        with open(os.path.join(DATASETS_METADATA_DIR, 'mnist.json'), 'r') as f:
+        with open(os.path.join(DATASETS_METADATA_DIR, f'{dataset_name}.json'), 'r') as f:
             metadata = json.load(f)
+        data = DATASETS_MAP[dataset_name]
         self.dataset = data(
             root=DATASETS_DIR, train=train, download=True,
             transform=torchvision.transforms.Compose([
@@ -202,12 +203,12 @@ class BaseDataLoader(DataLoader):
 
 
 # Functions
-def make_tv_dataloaders(data: type(datasets.VisionDataset), dev_split: float = None, batch_size: int = 64,
+def make_tv_dataloaders(dataset_name: str, dev_split: float = None, batch_size: int = 64,
                         flatten_images: bool = False, sampling_mode: str = None, num_workers: int = 0):
     """
     This function takes a dataset class name from torchvision.datasets and return data loaders of train, dev and test
     splits of said dataset.
-    :param data: type: type(torchvision.datasets.VisionDataset). (Required) A PyTorch built-in vision dataset that will
+    :param dataset_name: type: type(torchvision.datasets.VisionDataset). (Required) A PyTorch built-in vision dataset that will
                  be downloaded and customized.
     :param dev_split: type: float. (Optional) The ratio to split the training set into a new training set and a
                       validation set. If not given, the training set will not be split.
@@ -219,11 +220,11 @@ def make_tv_dataloaders(data: type(datasets.VisionDataset), dev_split: float = N
     :return: (train: DataLoader, dev: DataLoader, test: DataLoader) or
              (train: DataLoader, test: DataLoader)
     """
-    train_set = TVDataset(data, train=True, flatten_images=flatten_images, sampling_mode=sampling_mode)
+    train_set = TVDataset(dataset_name, train=True, flatten_images=flatten_images, sampling_mode=sampling_mode)
     dev_set = None
     if dev_split is not None:
         train_set, dev_set = train_test_split(train_set, test_size=dev_split)
-    test_set = TVDataset(data, train=False, flatten_images=flatten_images, sampling_mode=sampling_mode,
+    test_set = TVDataset(dataset_name, train=False, flatten_images=flatten_images, sampling_mode=sampling_mode,
                          make_imbalanced=False)
     train_loader = DataLoader(dataset=train_set,
                               batch_size=batch_size,

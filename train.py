@@ -98,7 +98,7 @@ def main(args):
                                          num_workers=args.num_workers)
     elif dataset_metadata['type'] == 'torchvisionDataset':
         train_loader_r, test_loader_r = make_tv_dataloaders(
-            data=data,
+            dataset_name=args.dataset.lower(),
             batch_size=args.batch_size,
             flatten_images=False
         )
