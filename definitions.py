@@ -4,6 +4,7 @@ This file contains constants frequently used by other modules.
 
 
 import os
+from model import GrowingNN as Grow
 from torchvision import datasets as datasets
 
 
@@ -17,6 +18,10 @@ LOGS_DIR = os.path.join(ROOT_DIR, 'logs')
 DATASETS_MAP = {'mnist': datasets.MNIST,
                 'cifar10': datasets.CIFAR10,
                 'cifar100': datasets.CIFAR100}
+ARCHITECTURES_MAP = {
+    'mlp': Grow.GrowingMLP,
+    'cnn': Grow.GrowingCNN
+}
 
 
 if __name__ == '__main__':

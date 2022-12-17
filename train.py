@@ -11,6 +11,7 @@ import dill
 import torchvision.datasets as datasets
 from data_loader.data_loader import *
 from model.GrowingNN import GrowingMLP, GrowingCNN
+from model import losses
 from trainer.trainer import Trainer
 from utils.utils import test_report, count_parameters, plot_activation
 from definitions import *
@@ -55,7 +56,8 @@ def main(args):
         label = dataset_metadata['label_col']
     elif dataset_metadata['type'] == 'torchvisionDataset':
         data = DATASETS_MAP[args.dataset.lower()]
-        model_class = GrowingMLP
+        model_class = ARCHITECTURES_MAP[args.architecture.lower()]
+        # model_class = GrowingMLP
     else:
         logger.critical("Invalid argument I guess...")
         data = None
@@ -95,12 +97,15 @@ def main(args):
         test_loader = make_df_dataloader(data=test_df, label=label, batch_size=args.batch_size, sampling_mode=None,
                                          num_workers=args.num_workers)
     elif dataset_metadata['type'] == 'torchvisionDataset':
-        train_loader, test_loader = make_tv_dataloaders(
+        train_loader_r, test_loader_r = make_tv_dataloaders(
             data=data,
             batch_size=args.batch_size,
-            flatten_images=True
+            flatten_images=False
         )
-        dev_loader = test_loader
+        dev_loader_r = test_loader_r
+        train_loader = train_loader_r
+        dev_loader = dev_loader_r
+        test_loader = test_loader_r
     else:
         train_loader, dev_loader, test_loader = None, None, None
         logger.critical("Invalid argument bruh")
@@ -112,16 +117,23 @@ def main(args):
     logger.info(f"Creating model with input_size={model_args['input_size']}, output_size={model_args['output_size']}")
     if args.proposed_method:
         # model = model_class(input_size, output_size, device=args.device, growing_method='random')
-        model = model_class(**model_args, device=args.device, growing_method='gradmax')
+        if args.ETF:
+            logger.info("Model is using an ETF classifier")
+            model = model_class(**model_args, ETF=True, device=args.device, growing_method='gradmax')
+        else:
+            model = model_class(**model_args, ETF=False, device=args.device, growing_method='gradmax')
         logger.info("Initializing parameters states")
         model.init_params_state()
     else:
         logger.info("Not applying proposed method. Initializing networks with higher params count.")
-        model = model_class(**model_args, hidden_sizes=(198, 394, 789, 394, 198))
-        # model = model_class(**model_args, device=args.device)
+        # model = model_class(**model_args, hidden_sizes=(198, 394, 789, 394, 198))
+        model = model_class(**model_args, ETF=False)
     if os.path.exists(os.path.join(CHECKPOINT_DIR, settings_name, "checkpoint.th")):
         model = torch.load(os.path.join(CHECKPOINT_DIR, settings_name, "checkpoint.th"), pickle_module=dill)
-    criterion = torch.nn.NLLLoss()
+    if args.DRLoss:
+        criterion = losses.DRLoss()
+    else:
+        criterion = torch.nn.NLLLoss()
     optimizer = torch.optim.Adam
     epochs = args.epochs
     lr = args.learning_rate
@@ -140,8 +152,8 @@ def main(args):
         trainer.train(train_loader=train_loader_r, dev_loader=dev_loader_r, gen_rate=args.gen_rate,
                       criterion=criterion, epochs=resampling_epochs, num_prints=args.num_prints,
                       high=args.high, low=args.low)
-        trainer.train(train_loader=train_loader, dev_loader=dev_loader, gen_rate=args.gen_rate,
-                      criterion=criterion, epochs=epochs, num_prints=args.num_prints, high=args.high, low=args.low)
+        # trainer.train(train_loader=train_loader, dev_loader=dev_loader, gen_rate=args.gen_rate,
+        #               criterion=criterion, epochs=epochs, num_prints=args.num_prints, high=args.high, low=args.low)
     else:
         # trainer.train(train_loader=train_loader_r, dev_loader=dev_loader_r, gen_rate=args.gen_rate,
         #               criterion=criterion, epochs=resampling_epochs, num_prints=args.num_prints,
@@ -180,8 +192,12 @@ def main(args):
         samples, target = samples.to(args.device), target.to(args.device)
         pred = model(samples)
         target = np.around(target.detach().cpu().numpy(), decimals=3)
-        plot_activation(model.activation_table, target,
-                        save_path=os.path.join(CHECKPOINT_DIR, settings_name, 'activation.png'))
+        if isinstance(model, GrowingCNN):
+            plot_activation(model.nonzero_pct, target,
+                            save_path=os.path.join(CHECKPOINT_DIR, settings_name, 'activation.png'))
+        else:
+            plot_activation(model.activation_table, target,
+                            save_path=os.path.join(CHECKPOINT_DIR, settings_name, 'activation.png'))
         del data, target, pred
     # logger.debug(f"linear4's weight: {model.linear4.weight}")
     # logger.debug(f"linear4's bias: {model.linear4.bias}")
@@ -192,7 +208,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="GrowingNN test")
-    parser.add_argument("--dataset", type=str, required=True, help="Directory to the dataset. (Required).")
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset name. (Required).")
+    parser.add_argument("--architecture", type=str, required=True, help="Architecture name. (Required).")
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.0001, help="The learning rate. Default: 0.0001")
     parser.add_argument("-e", "--epochs", type=int, default=3, help='The number of epochs to train. Default: 3'
                                                                     'The model will be trained for 30*epochs epochs '
@@ -220,6 +237,8 @@ if __name__ == '__main__':
                         help="To apply the proposed method.")
     parser.add_argument("--no_proposed_method", dest="proposed_method", action='store_false',
                         help="Do not apply the proposed method.")
+    parser.add_argument("--ETF", action="store_true", default=False, help="To apply the ETF Classifier")
+    parser.add_argument("--DRLoss", action='store_true', default=False, help="To apply the Dot Regression Loss")
     args = parser.parse_args()
 
     args_var = vars(args).copy()

@@ -6,6 +6,7 @@ import logging
 import copy
 import os
 import dill
+from model import losses
 from definitions import *
 
 
@@ -58,10 +59,21 @@ class Trainer:
                 # optimizer.zero_grad()
                 self.optimizer.zero_grad()
                 output = self.model(data)
+                if isinstance(criterion, losses.DRLoss):
+                    output_feature = self.model.hidden_table[self.model.prev_layer_look_up['output_layer']]
+                    output_feature = output_feature.reshape(output_feature.size(0), -1)
+                    with torch.no_grad():
+                        output_feature_nograd = output_feature.detach()
+                        feature_length = torch.clamp(torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
+                                                     1e-8)
+                    learned_norm = losses.produce_Ew(target, 2)
+                    cur_M = self.model.output_layer.ori_M * learned_norm
+                    loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                else:
+                    loss = criterion(output, target)
                 with torch.no_grad():
                     predicted = output.argmax(dim=1, keepdim=True)
                     train_correct += predicted.eq(target.view_as(predicted)).sum().item()
-                loss = criterion(output, target)
                 loss.backward()
                 # optimizer.step()
                 self.optimizer.step()
@@ -94,7 +106,18 @@ class Trainer:
                     data, target = next(dev_iter)
                     data, target = data.to(self.device), target.to(self.device)
                     pred = self.model(data)
-                    loss = criterion(pred, target)
+                    if isinstance(criterion, losses.DRLoss):
+                        output_feature = self.model.hidden_table[self.model.prev_layer_look_up['output_layer']]
+                        output_feature = output_feature.view(output_feature.size(0), -1)
+                        with torch.no_grad():
+                            output_feature_nograd = output_feature.detach()
+                            feature_length = torch.clamp(torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
+                                                      1e-8)
+                        learned_norm = losses.produce_Ew(target, 2)
+                        cur_M = self.model.output_layer.ori_M * learned_norm
+                        loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                    else:
+                        loss = criterion(pred, target)
                     loss.backward()
                     self.model.generate_neurons(gen_rate, data, target)
                     gen_rate *= 0.9
@@ -117,7 +140,18 @@ class Trainer:
                     output = self.model(data)
                     predicted = output.argmax(dim=1, keepdim=True)
                     dev_correct += predicted.eq(target.view_as(predicted)).sum().item()
-                    loss = criterion(output, target)
+                    if isinstance(criterion, losses.DRLoss):
+                        output_feature = self.model.hidden_table[self.model.prev_layer_look_up['output_layer']]
+                        output_feature = output_feature.reshape(output_feature.size(0), -1)
+                        with torch.no_grad():
+                            output_feature_nograd = output_feature.detach()
+                            feature_length = torch.clamp(torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
+                                                      1e-8)
+                        learned_norm = losses.produce_Ew(target, 2)
+                        cur_M = self.model.output_layer.ori_M * learned_norm
+                        loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                    else:
+                        loss = criterion(output, target)
                     dev_loss += loss.item()
                     if batch_idx * dev_loader.batch_size >= print_num_dev * samples_per_print_dev:
                         logger.info(

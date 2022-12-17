@@ -165,6 +165,9 @@ class TVDataset(Dataset):
                     continue
                 self.data_indices.append(idx)
                 self.sample_count[label] += 1
+        logger.info(f"Dataset sample count:")
+        for c in self.sample_count.keys():
+            logger.info(f"Class: {c}. Sample count: {self.sample_count[c]}")
         self._len = len(self.data_indices)
         self.flatten_images = flatten_images
         self.sampling_mode = sampling_mode
