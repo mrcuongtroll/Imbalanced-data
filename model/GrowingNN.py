@@ -64,8 +64,9 @@ class GrowingMLP(nn.Module):
                  growing_method='gradmax', device='cuda'):
         super(GrowingMLP, self).__init__()
         if input_img_size is not None:
-            input_size *= np.prod(input_img_size)
-        logger.info(input_size)
+            input_size_final = input_size * np.prod(input_img_size)
+        else:
+            input_size_final = input_size
         self.device = device
         self.ETF = ETF
         self.activation_table = {}
@@ -74,7 +75,7 @@ class GrowingMLP(nn.Module):
         self.hook_table = {}
         assert growing_method.lower() in ('random', 'gradmax'), "Growing method must be either 'random' or 'gradmax'"
         self.growing_method = growing_method
-        self.linear1 = nn.Linear(input_size, hidden_sizes[0])
+        self.linear1 = nn.Linear(input_size_final, hidden_sizes[0])
         self.linear2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
         self.linear3 = nn.Linear(hidden_sizes[1], hidden_sizes[2])
         self.linear4 = nn.Linear(hidden_sizes[2], hidden_sizes[3])
