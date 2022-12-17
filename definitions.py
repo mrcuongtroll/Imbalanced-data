@@ -23,7 +23,7 @@ ARCHITECTURES_MAP = {
     'cnn': Grow.GrowingCNN
 }
 FLATTEN_FOR_ARCH = {
-    'mlp': True
+    'mlp': True,
     'cnn': False
 }
 
