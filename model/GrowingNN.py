@@ -65,6 +65,7 @@ class GrowingMLP(nn.Module):
         super(GrowingMLP, self).__init__()
         if input_img_size is not None:
             input_size *= np.prod(input_img_size)
+        logger.info(input_size)
         self.device = device
         self.ETF = ETF
         self.activation_table = {}
