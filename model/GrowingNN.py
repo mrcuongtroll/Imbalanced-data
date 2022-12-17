@@ -124,7 +124,8 @@ class GrowingMLP(nn.Module):
                                    'linear2': 'linear1',
                                    'linear3': 'linear2',
                                    'linear4': 'linear3',
-                                   'linear5': 'linear4'}
+                                   'linear5': 'linear4',
+                                   'output_layer': 'linear5'}
         return
 
     def forward(self, x):
