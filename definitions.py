@@ -22,6 +22,10 @@ ARCHITECTURES_MAP = {
     'mlp': Grow.GrowingMLP,
     'cnn': Grow.GrowingCNN
 }
+FLATTEN_FOR_ARCH = {
+    'mlp': True
+    'cnn': False
+}
 
 
 if __name__ == '__main__':

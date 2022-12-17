@@ -183,7 +183,6 @@ class TVDataset(Dataset):
         true_idx = self.data_indices[idx]
         data, target = self.dataset[true_idx]
         if self.flatten_images:
-            logger.info(torch.flatten(data).shape)
             return torch.flatten(data), torch.tensor(target, dtype=torch.long)
         else:
             return data, torch.tensor(target, dtype=torch.long)

@@ -100,7 +100,7 @@ def main(args):
         train_loader_r, test_loader_r = make_tv_dataloaders(
             dataset_name=args.dataset.lower(),
             batch_size=args.batch_size,
-            flatten_images=False
+            flatten_images=FLATTEN_FOR_ARCH[args.architecture.lower()]
         )
         dev_loader_r = test_loader_r
         train_loader = train_loader_r
