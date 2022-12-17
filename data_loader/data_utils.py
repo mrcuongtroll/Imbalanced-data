@@ -127,7 +127,7 @@ def get_cifar10():
                      "test": {i: 0 for i in range(0, 10)},
                  },
                  "model_args": {
-                     "input_size": 1,
+                     "input_size": 3,
                      "output_size": 2,
                      "input_img_size": (32, 32)
                  }

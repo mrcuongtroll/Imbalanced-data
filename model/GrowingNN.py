@@ -60,7 +60,7 @@ class GrowingNN(nn.Module):
 
 class GrowingMLP(nn.Module):
 
-    def __init__(self, input_size, output_size, ETF: bool, hidden_sizes=(128, 256, 512, 256, 128),
+    def __init__(self, input_size, output_size, input_img_size=None, ETF=False, hidden_sizes=(128, 256, 512, 256, 128),
                  growing_method='gradmax', device='cuda'):
         super(GrowingMLP, self).__init__()
         self.device = device
