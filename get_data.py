@@ -8,7 +8,8 @@ import argparse
 
 # Constants
 DATASET_GET_FUNC = {'creditcard': get_creditcard,
-                    'mnist': get_mnist}
+                    'mnist': get_mnist,
+                    'cifar10': get_cifar10}
 
 
 if __name__ == '__main__':
