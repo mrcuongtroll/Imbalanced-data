@@ -74,6 +74,8 @@ class Trainer:
                         learned_norm = losses.produce_Ew(target, 2)
                         cur_M = self.model.output_layer.ori_M * learned_norm
                         loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                    else:
+                        loss = criterion(output, target)
                 else:
                     output = self.model(data)
                     loss = criterion(output, target)
@@ -126,6 +128,8 @@ class Trainer:
                             learned_norm = losses.produce_Ew(target, 2)
                             cur_M = self.model.output_layer.ori_M * learned_norm
                             loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                        else:
+                            loss = criterion(output, target)
                     else:
                         output = self.model(data)
                         loss = criterion(output, target)
@@ -163,6 +167,8 @@ class Trainer:
                             learned_norm = losses.produce_Ew(target, 2)
                             cur_M = self.model.output_layer.ori_M * learned_norm
                             loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                        else:
+                            loss = criterion(output, target)
                     else:
                         output = self.model(data)
                         loss = criterion(output, target)
