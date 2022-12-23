@@ -33,8 +33,7 @@ class DRLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    @staticmethod
-    def forward(output, label, cur_M, H_length, reg_lam=0.0):
+    def forward(self, output, label, cur_M, H_length, reg_lam=0.0):
         return dot_loss(output, label, cur_M, H_length, reg_lam)
 
     
