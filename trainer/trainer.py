@@ -21,7 +21,7 @@ logger = logging.getLogger(name=__name__)
 
 # Classes
 class Trainer:
-    def __init__(self, model, optimizer: type(torch.optim.Optimizer), ETF=False, learning_rate=0.0001, device='cuda',
+    def __init__(self, model, optimizer: type(torch.optim.Optimizer), learning_rate=0.0001, device='cuda',
                  checkpoint_name=None):
         super(Trainer, self).__init__()
         self.model = model.to(device)
@@ -29,7 +29,7 @@ class Trainer:
         self.optimizer_class = optimizer
         self.learning_rate = learning_rate
         self.optimizer = optimizer(self.model.parameters(), lr=learning_rate)
-        self.ETF = ETF
+        self.ETF = self.model.ETF
         self.train_loss_history = []
         self.dev_loss_history = []
         self.iter_milestones = []

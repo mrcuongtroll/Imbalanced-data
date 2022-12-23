@@ -128,10 +128,7 @@ def main(args):
     else:
         logger.info("Not applying proposed method. Initializing networks with higher params count.")
         # model = model_class(**model_args, hidden_sizes=(198, 394, 789, 394, 198))
-        if args.ETF:
-            model = model_class(**model_args, ETF=True)
-        else:
-            model = model_class(**model_args, ETF=False)
+        model = model_class(**model_args, ETF=args.ETF)
     if os.path.exists(os.path.join(CHECKPOINT_DIR, settings_name, "checkpoint.th")):
         model = torch.load(os.path.join(CHECKPOINT_DIR, settings_name, "checkpoint.th"), pickle_module=dill)
     if args.DRLoss:
@@ -142,7 +139,7 @@ def main(args):
     epochs = args.epochs
     lr = args.learning_rate
     logger.info(f"Training GrowingMLP: Criterion={criterion} | Optimizer={optimizer} | Epochs={epochs} | lr={lr}")
-    trainer = Trainer(model=model, optimizer=optimizer, ETF=args.ETF, learning_rate=args.learning_rate, device=args.device,
+    trainer = Trainer(model=model, optimizer=optimizer, learning_rate=args.learning_rate, device=args.device,
                       checkpoint_name=settings_name)
     if os.path.exists(os.path.join(CHECKPOINT_DIR, settings_name, "trainer.th")):
         trainer_state = torch.load(os.path.join(CHECKPOINT_DIR, settings_name, "trainer.th"))
