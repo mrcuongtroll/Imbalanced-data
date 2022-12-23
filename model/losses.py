@@ -33,7 +33,8 @@ class DRLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, output, label, cur_M, H_length, reg_lam=0.0):
+    @staticmethod
+    def forward(output, label, cur_M, H_length, reg_lam=0.0):
         return dot_loss(output, label, cur_M, H_length, reg_lam)
 
     
@@ -46,7 +47,7 @@ def dot_loss(output, label, cur_M, H_length, reg_lam=0.0):
     dot = torch.bmm(output.unsqueeze(1), target.unsqueeze(2)).view(-1)
     with torch.no_grad():
         M_length = torch.sqrt(torch.sum(target ** 2, dim=1, keepdims=False))
-    loss = (1/2) * torch.mean(((dot-(M_length * H_length)) ** 2) / (H_length*M_length))
+    loss = (1/2) * torch.mean(((dot-torch.sqrt(M_length * H_length)) ** 2) / (H_length*M_length))
     if reg_lam > 0:
         reg_Eh_l2 = torch.mean(torch.sqrt(torch.sum(output ** 2, dim=1, keepdims=True)))
         loss = loss + reg_Eh_l2*reg_lam

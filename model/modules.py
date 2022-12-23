@@ -33,9 +33,9 @@ class CustomReLU(nn.Module):
         return _custom_relu(x)
 
 
-class ETF_Classifier(nn.Module):
+class ETFClassifier(nn.Module):
     def __init__(self, feat_in, num_classes, fix_bn=False, LWS=False, reg_ETF=False, device='cuda'):
-        super(ETF_Classifier, self).__init__()
+        super(ETFClassifier, self).__init__()
         P = self.generate_random_orthogonal_matrix(feat_in, num_classes)
         I = torch.eye(num_classes)
         one = torch.ones(num_classes, num_classes)
