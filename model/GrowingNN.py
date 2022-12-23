@@ -373,6 +373,7 @@ class GrowingMLP(nn.Module):
                                 # TODO: only freeze if that neuron contributes to a good prediction
                                 self.freeze_neuron(layer, index)
                                 self.num_unfrozen_neurons -= 1
+                                layer_num_frozen += 1
                                 num_frozen += 1
                 if layer_num_frozen > 0:
                     logger.info(f'{layer_num_frozen} neurons of {layer} has been frozen')
