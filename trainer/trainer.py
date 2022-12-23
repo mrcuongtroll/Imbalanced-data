@@ -21,7 +21,7 @@ logger = logging.getLogger(name=__name__)
 
 # Classes
 class Trainer:
-    def __init__(self, model, optimizer: type(torch.optim.Optimizer), learning_rate=0.0001, device='cuda',
+    def __init__(self, model, optimizer: type(torch.optim.Optimizer), ETF=False, learning_rate=0.0001, device='cuda',
                  checkpoint_name=None):
         super(Trainer, self).__init__()
         self.model = model.to(device)
@@ -29,6 +29,7 @@ class Trainer:
         self.optimizer_class = optimizer
         self.learning_rate = learning_rate
         self.optimizer = optimizer(self.model.parameters(), lr=learning_rate)
+        self.ETF = ETF
         self.train_loss_history = []
         self.dev_loss_history = []
         self.iter_milestones = []
@@ -58,18 +59,22 @@ class Trainer:
                 data, target = data.to(self.device), target.to(self.device)
                 # optimizer.zero_grad()
                 self.optimizer.zero_grad()
-                output = self.model(data)
-                if isinstance(criterion, losses.DRLoss):
-                    output_feature = self.model.hidden_table[self.model.prev_layer_look_up['output_layer']]
-                    output_feature = output_feature.reshape(output_feature.size(0), -1)
-                    with torch.no_grad():
-                        output_feature_nograd = output_feature.detach()
-                        feature_length = torch.clamp(torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
-                                                     1e-8)
-                    learned_norm = losses.produce_Ew(target, 2)
-                    cur_M = self.model.output_layer.ori_M * learned_norm
-                    loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
+                if self.ETF:
+                    output_feature = self.model(data)
+                    softmax = nn.LogSoftmax(dim=1)
+                    output = softmax(output_feature)
+                    if isinstance(criterion, losses.DRLoss):
+                        output_feature = output_feature.reshape(output_feature.size(0), -1)
+                        with torch.no_grad():
+                            output_feature_nograd = output_feature.detach()
+                            feature_length = torch.clamp(
+                                torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
+                                1e-8)
+                        learned_norm = losses.produce_Ew(target, 2)
+                        cur_M = self.model.output_layer.ori_M * learned_norm
+                        loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
                 else:
+                    output = self.model(data)
                     loss = criterion(output, target)
                 with torch.no_grad():
                     predicted = output.argmax(dim=1, keepdim=True)

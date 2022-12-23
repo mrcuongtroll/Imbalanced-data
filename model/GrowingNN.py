@@ -81,9 +81,9 @@ class GrowingMLP(nn.Module):
         self.linear4 = nn.Linear(hidden_sizes[2], hidden_sizes[3])
         self.linear5 = nn.Linear(hidden_sizes[3], hidden_sizes[4])
         if ETF:
-            self.output_layer = modules.ETFClassifier(hidden_sizes[4], output_size)
-            for weight in self.output_layer.parameters():
-                weight.requires_grad = False
+            self.output_layer = modules.ETFClassifier(hidden_sizes[4], output_size, device=device)
+            # for weight in self.output_layer.parameters():
+            #     weight.requires_grad = False
         else:
             self.output_layer = nn.Linear(hidden_sizes[4], output_size)
         self.num_neurons = sum(hidden_sizes)
@@ -163,12 +163,12 @@ class GrowingMLP(nn.Module):
         self.hidden_table['linear5'] = h5
         # self.pre_act_grad_table['output_layer'] = out
         if self.ETF:
-            with torch.no_grad():
-                out = self.output_layer(h5)
+            out = self.output_layer(h5)
+            return out
         else:
             out = self.output_layer(h5)
             out.requires_grad_().register_hook(lambda grad: self.pre_activation_hook(grad, 'output_layer'))
-        out = self.softmax(out)
+            out = self.softmax(out)
         return out
 
     def init_params_state(self):
@@ -403,7 +403,7 @@ class GrowingCNN(nn.Module):
         pre_out = self._pre_output(torch.rand((1, input_size, *input_img_size)))
         pre_out_HW = pre_out.shape[-2:]
         if ETF:
-            self.output_layer = modules.ETFClassifier(64 * np.prod(pre_out_HW), output_size)
+            self.output_layer = modules.ETFClassifier(64 * np.prod(pre_out_HW), output_size, device=device)
             for weight in self.output_layer.parameters():
                 weight.requires_grad = False
         else:
@@ -684,3 +684,8 @@ class GrowingCNN(nn.Module):
                 if layer_num_frozen > 0:
                     logger.info(f'{layer_num_frozen} neurons of {layer} has been frozen')
         return num_frozen
+
+
+if __name__ == '__main__':
+    a = GrowingMLP(3, 2, (32, 32), ETF=True, device='cpu')
+    print(a.output_layer.BN_H.bias.requires_grad)
