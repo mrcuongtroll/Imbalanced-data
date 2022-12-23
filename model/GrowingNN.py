@@ -684,8 +684,3 @@ class GrowingCNN(nn.Module):
                 if layer_num_frozen > 0:
                     logger.info(f'{layer_num_frozen} neurons of {layer} has been frozen')
         return num_frozen
-
-
-if __name__ == '__main__':
-    a = GrowingMLP(3, 2, (32, 32), ETF=True, device='cpu')
-    print(a.output_layer.BN_H.bias.requires_grad)

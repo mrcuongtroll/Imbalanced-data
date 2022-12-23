@@ -163,7 +163,7 @@ def main(args):
                       freeze_neurons=False)
     params, params_table = count_parameters(model)
     logger.debug(f"Total number of parameters: {params}.\n{params_table}")
-    test_report(model, test_loader)
+    test_report(model, test_loader, ETF=args.ETF)
 
     # Activation plot
     with torch.no_grad():

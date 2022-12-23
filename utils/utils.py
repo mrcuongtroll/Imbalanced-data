@@ -14,14 +14,20 @@ logger = logging.getLogger(__name__)
 
 
 # Functions
-def test_report(model: torch.nn.Module, test_loader: DataLoader, device='cuda'):
+def test_report(model: torch.nn.Module, test_loader: DataLoader, ETF=False, device='cuda'):
     y_true = []
     y_pred = []
     model.to(device)
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(test_loader):
             data, target = data.to(device), target.to(device)
-            out = model(data)
+            if ETF:
+                feature = model(data)
+                softmax = nn.Softmax(dim=1)
+                logits = feature @ model.output_layer.ori_M
+                out = softmax(logits)
+            else:
+                out = model(data)
             out = torch.argmax(out, dim=1)
             y_pred.append(out)
             y_true.append(target)
