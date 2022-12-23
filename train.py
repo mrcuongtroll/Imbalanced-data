@@ -1,4 +1,5 @@
 import sys
+import torch.nn as nn
 import torch
 import logging
 import argparse
@@ -172,6 +173,9 @@ def main(args):
         target = []
         count = 0
         target_label = 0
+        if args.ETF:
+            softmax = nn.LogSoftmax(dim=1)
+            ori_M = model.output_layer.ori_M
         for sample, label in test_dataset:
             # if target_label == len(dataset_metadata['classes']):
             if target_label == 2:
@@ -179,10 +183,10 @@ def main(args):
             if label == target_label:
                 if args.ETF:
                     features = model(sample.unsqueeze(0).to(args.device))
-                    softmax = nn.Softmax()
+                    out = softmax(features @ ori_M)
                 else:
                     out = model(sample.unsqueeze(0).to(args.device))
-                    pred = out.argmax(dim=1)
+                pred = out.argmax(dim=1)
                 if pred.item() == label.item(): # and out.exp().max() >= 0.95:
                     samples.append(sample.detach().cpu().numpy())
                     target.append(out.exp()[0, 1].item())
