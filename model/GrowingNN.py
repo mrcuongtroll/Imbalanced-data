@@ -347,6 +347,8 @@ class GrowingMLP(nn.Module):
                         for index in range(activation.shape[1]):
                             activation_by_label[layer][index][label] += np.sum(activation[:, index] * label_mask)
             for layer in self.layer_names:
+                if self.next_layer_look_up[layer] == 'output_layer':
+                    continue
                 layer_num_frozen = 0
                 for index in range(len(self.activation_table[layer][0])):
                     # Don't freeze already frozen neurons:
