@@ -136,9 +136,10 @@ class TVDataset(Dataset):
         :param minority_classes: type: tuple(int). (Required, default=(1,)) The minority classes.
         """
         super(TVDataset, self).__init__()
-        assert os.path.exists(os.path.join(DATASETS_METADATA_DIR, f'{dataset_name}.json')), "Metadata for MNIST not found. " \
-                                                                                  "Please create one or run " \
-                                                                                  "python get_data.py -d=mnist"
+        assert os.path.exists(os.path.join(DATASETS_METADATA_DIR, f'{dataset_name}.json')), \
+            "Metadata for MNIST not found. " \
+            "Please create one or run " \
+            "python get_data.py -d=mnist"
         with open(os.path.join(DATASETS_METADATA_DIR, f'{dataset_name}.json'), 'r') as f:
             metadata = json.load(f)
         data = DATASETS_MAP[dataset_name]

@@ -145,8 +145,7 @@ class Trainer:
                         output_feature = output_feature.reshape(output_feature.size(0), -1)
                         with torch.no_grad():
                             output_feature_nograd = output_feature.detach()
-                            feature_length = torch.clamp(torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
-                                                      1e-8)
+                            feature_length = torch.clamp(torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)), 1e-8)
                         learned_norm = losses.produce_Ew(target, 2)
                         cur_M = self.model.output_layer.ori_M * learned_norm
                         loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)

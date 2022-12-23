@@ -344,6 +344,7 @@ class GrowingMLP(nn.Module):
                         for index in range(activation.shape[1]):
                             activation_by_label[layer][index][label] += np.sum(activation[:, index] * label_mask)
             for layer in self.layer_names:
+                layer_num_frozen = 0
                 for index in range(len(self.activation_table[layer][0])):
                     # Don't freeze already frozen neurons:
                     if math.isclose(self.params_state[f'{layer}.bias'][index], 0.0):
@@ -370,6 +371,9 @@ class GrowingMLP(nn.Module):
                                 self.freeze_neuron(layer, index)
                                 self.num_unfrozen_neurons -= 1
                                 num_frozen += 1
+                if layer_num_frozen > 0:
+                    logger.info(f'{layer_num_frozen} neurons of {layer} has been frozen')
+
         return num_frozen
 
 
@@ -646,6 +650,7 @@ class GrowingCNN(nn.Module):
                         for index in range(activation.shape[1]):
                             activation_by_label[layer][index][label] += np.sum(activation[:, index] * label_mask)
             for layer in self.layer_names:
+                layer_num_frozen = 0
                 for index in range(len(self.activation_table[layer][0])):
                     # Don't freeze already frozen neurons:
                     if math.isclose(self.params_state[f'{layer}.bias'][index], 0.0):
@@ -672,4 +677,7 @@ class GrowingCNN(nn.Module):
                                 self.freeze_neuron(layer, index)
                                 self.num_unfrozen_neurons -= 1
                                 num_frozen += 1
+                                layer_num_frozen += 1
+                if layer_num_frozen > 0:
+                    logger.info(f'{layer_num_frozen} neurons of {layer} has been frozen')
         return num_frozen

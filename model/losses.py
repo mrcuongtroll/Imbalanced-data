@@ -65,8 +65,6 @@ def produce_Ew(label, num_classes):
         label_id = uni_label[i]
         label_count = count[i]
         length = torch.sqrt(gamma / label_count)
-#        length = (gamma / label_count)
-        #length = torch.sqrt(label_count / gamma)
         Ew[0, label_id] = length
 
     return Ew
