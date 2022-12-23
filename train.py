@@ -177,8 +177,12 @@ def main(args):
             if target_label == 2:
                 break
             if label == target_label:
-                out = model(sample.unsqueeze(0).to(args.device))
-                pred = out.argmax(dim=1)
+                if args.ETF:
+                    features = model(sample.unsqueeze(0).to(args.device))
+                    softmax = nn.Softmax()
+                else:
+                    out = model(sample.unsqueeze(0).to(args.device))
+                    pred = out.argmax(dim=1)
                 if pred.item() == label.item(): # and out.exp().max() >= 0.95:
                     samples.append(sample.detach().cpu().numpy())
                     target.append(out.exp()[0, 1].item())

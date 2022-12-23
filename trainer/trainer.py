@@ -41,6 +41,9 @@ class Trainer:
     def train(self, train_loader, criterion, dev_loader, epochs=100, num_prints=10,
               gen_rate=0.2, high=0.85, low=0.15, generation_threshold=0.3, switched_train_loader=False,
               freeze_neurons=True):
+        if self.ETF:
+            softmax = nn.LogSoftmax(dim=1)
+            ori_M = self.model.output_layer.ori_M
         best_dev_loss = np.inf
         best_model = None
         if switched_train_loader:
@@ -61,9 +64,8 @@ class Trainer:
                 self.optimizer.zero_grad()
                 if self.ETF:
                     output_feature = self.model(data)
-                    output_logits = output_feature @ self.model.output_layer.ori_M
-                    softmax = nn.LogSoftmax(dim=1)
-                    output = softmax(output_logits)
+                    with torch.no_grad():
+                        output = softmax(output_feature @ ori_M).detach()
                     if isinstance(criterion, losses.DRLoss):
                         output_feature = output_feature.reshape(output_feature.size(0), -1)
                         with torch.no_grad():
@@ -72,7 +74,7 @@ class Trainer:
                                 torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
                                 1e-8)
                         learned_norm = losses.produce_Ew(target, 2)
-                        cur_M = self.model.output_layer.ori_M * learned_norm
+                        cur_M = ori_M * learned_norm
                         loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
                     else:
                         loss = criterion(output, target)
@@ -115,9 +117,8 @@ class Trainer:
                     data, target = data.to(self.device), target.to(self.device)
                     if self.ETF:
                         output_feature = self.model(data)
-                        output_logits = output_feature @ self.model.output_layer.ori_M
-                        softmax = nn.LogSoftmax(dim=1)
-                        output = softmax(output_logits)
+                        with torch.no_grad():
+                            output = softmax(output_feature @ ori_M)
                         if isinstance(criterion, losses.DRLoss):
                             output_feature = output_feature.reshape(output_feature.size(0), -1)
                             with torch.no_grad():
@@ -126,7 +127,7 @@ class Trainer:
                                     torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
                                     1e-8)
                             learned_norm = losses.produce_Ew(target, 2)
-                            cur_M = self.model.output_layer.ori_M * learned_norm
+                            cur_M = ori_M * learned_norm
                             loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
                         else:
                             loss = criterion(output, target)
@@ -154,9 +155,8 @@ class Trainer:
                     data, target = data.to(self.device), target.to(self.device)
                     if self.ETF:
                         output_feature = self.model(data)
-                        output_logits = output_feature @ self.model.output_layer.ori_M
-                        softmax = nn.LogSoftmax(dim=1)
-                        output = softmax(output_logits)
+                        with torch.no_grad():
+                            output = softmax(output_feature @ ori_M)
                         if isinstance(criterion, losses.DRLoss):
                             output_feature = output_feature.reshape(output_feature.size(0), -1)
                             with torch.no_grad():
@@ -165,7 +165,7 @@ class Trainer:
                                     torch.sqrt(torch.sum(output_feature_nograd ** 2, dim=1, keepdims=False)),
                                     1e-8)
                             learned_norm = losses.produce_Ew(target, 2)
-                            cur_M = self.model.output_layer.ori_M * learned_norm
+                            cur_M = ori_M * learned_norm
                             loss = criterion(output_feature, target, cur_M, feature_length, reg_lam=0)
                         else:
                             loss = criterion(output, target)

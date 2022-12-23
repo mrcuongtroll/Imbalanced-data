@@ -18,14 +18,14 @@ def test_report(model: torch.nn.Module, test_loader: DataLoader, ETF=False, devi
     y_true = []
     y_pred = []
     model.to(device)
+    if ETF:
+        softmax = nn.Softmax(dim=1)
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(test_loader):
             data, target = data.to(device), target.to(device)
             if ETF:
                 feature = model(data)
-                softmax = nn.Softmax(dim=1)
-                logits = feature @ model.output_layer.ori_M
-                out = softmax(logits)
+                out = softmax(feature @ model.output_layer.ori_M)
             else:
                 out = model(data)
             out = torch.argmax(out, dim=1)
@@ -58,9 +58,15 @@ def plot_activation(activations, label, save_path=None):
     plt.show()
 
 
-def plot_pr_curve(model: nn.Module, test_dataset: Dataset, ax=None, title=None, device='cuda'):
+def plot_pr_curve(model: nn.Module, test_dataset: Dataset, ETF=False, ax=None, title=None, device='cuda'):
     with torch.no_grad():
-        output = model(test_dataset.data.to(device))
+        if ETF:
+            ori_M = model.output_layer.ori_M
+            features = model(test_dataset.data.to(device))
+            softmax = nn.LogSoftmax(dim=1)
+            output = softmax(features @ ori_M)
+        else:
+            output = model(test_dataset.data.to(device))
         positive_prob = output[:, 1]
     precision, recall, thresholds = precision_recall_curve(test_dataset.label, positive_prob.detach().cpu().numpy())
     area_under_the_curve = auc(recall, precision)
