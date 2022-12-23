@@ -138,7 +138,7 @@ def main(args):
     epochs = args.epochs
     lr = args.learning_rate
     logger.info(f"Training GrowingMLP: Criterion={criterion} | Optimizer={optimizer} | Epochs={epochs} | lr={lr}")
-    trainer = Trainer(model=model, optimizer=optimizer, learning_rate=args.learning_rate, device=args.device,
+    trainer = Trainer(model=model, optimizer=optimizer, ETF=args.ETF, learning_rate=args.learning_rate, device=args.device,
                       checkpoint_name=settings_name)
     if os.path.exists(os.path.join(CHECKPOINT_DIR, settings_name, "trainer.th")):
         trainer_state = torch.load(os.path.join(CHECKPOINT_DIR, settings_name, "trainer.th"))
