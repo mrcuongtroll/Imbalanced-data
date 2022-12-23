@@ -128,7 +128,7 @@ def main(args):
     else:
         logger.info("Not applying proposed method. Initializing networks with higher params count.")
         # model = model_class(**model_args, hidden_sizes=(198, 394, 789, 394, 198))
-        model = model_class(**model_args, ETF=True)
+        model = model_class(**model_args, ETF=args.ETF)
     if os.path.exists(os.path.join(CHECKPOINT_DIR, settings_name, "checkpoint.th")):
         model = torch.load(os.path.join(CHECKPOINT_DIR, settings_name, "checkpoint.th"), pickle_module=dill)
     if args.DRLoss:
