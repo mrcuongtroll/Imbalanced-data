@@ -64,8 +64,7 @@ class Trainer:
                 self.optimizer.zero_grad()
                 if self.ETF:
                     output_feature = self.model(data)
-                    with torch.no_grad():
-                        output = softmax(output_feature @ ori_M).detach()
+                    output = softmax(output_feature @ ori_M).detach()
                     if isinstance(criterion, losses.DRLoss):
                         output_feature = output_feature.reshape(output_feature.size(0), -1)
                         with torch.no_grad():
@@ -117,8 +116,7 @@ class Trainer:
                     data, target = data.to(self.device), target.to(self.device)
                     if self.ETF:
                         output_feature = self.model(data)
-                        with torch.no_grad():
-                            output = softmax(output_feature @ ori_M)
+                        output = softmax(output_feature @ ori_M)
                         if isinstance(criterion, losses.DRLoss):
                             output_feature = output_feature.reshape(output_feature.size(0), -1)
                             with torch.no_grad():
@@ -155,8 +153,7 @@ class Trainer:
                     data, target = data.to(self.device), target.to(self.device)
                     if self.ETF:
                         output_feature = self.model(data)
-                        with torch.no_grad():
-                            output = softmax(output_feature @ ori_M)
+                        output = softmax(output_feature @ ori_M)
                         if isinstance(criterion, losses.DRLoss):
                             output_feature = output_feature.reshape(output_feature.size(0), -1)
                             with torch.no_grad():
