@@ -41,7 +41,7 @@ def plot_activation(activations, label, save_path=None):
         if len(layer_activation.shape) == 1:
             ax.bar(range(len(layer_activation)), layer_activation, color='blue')
         elif len(layer_activation.shape) == 2:
-            ax.imshow(layer_activation, cmap='Blues', vmin=-0.5, vmax=0.5)
+            ax.imshow(layer_activation, cmap='Blues', vmin=-0.005, vmax=0.005)
         ax.set_title(layer_name)
         return
     fig, axes = plt.subplots(5, figsize=(20, 20), tight_layout=True)
