@@ -64,7 +64,7 @@ class Trainer:
                 self.optimizer.zero_grad()
                 if self.ETF:
                     output_feature = self.model(data)
-                    output = softmax(output_feature @ ori_M).detach()
+                    output = softmax(output_feature @ ori_M)
                     if isinstance(criterion, losses.DRLoss):
                         output_feature = output_feature.reshape(output_feature.size(0), -1)
                         with torch.no_grad():
